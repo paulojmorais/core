@@ -24,6 +24,15 @@ class Network extends Observable {
     }
 
     /**
+     * @type {number}
+     * @constant
+     */
+    static get MAX_TIME_OFFSET() {
+        // 15 min
+        return 1000 * 60 * 15;
+    }
+
+    /**
      * @param {IBlockchain} blockchain
      * @param {NetworkConfig} netconfig
      * @param {Time} time
@@ -481,11 +490,14 @@ class Network extends Observable {
         const offsetsLength = offsets.length;
         offsets.sort((a, b) => a - b);
 
+        let timeOffset;
         if ((offsetsLength % 2) === 0) {
-            this._time.offset = Math.round((offsets[(offsetsLength / 2) - 1] + offsets[offsetsLength / 2]) / 2);
+            timeOffset = Math.round((offsets[(offsetsLength / 2) - 1] + offsets[offsetsLength / 2]) / 2);
         } else {
-            this._time.offset = offsets[(offsetsLength - 1) / 2];
+            timeOffset = offsets[(offsetsLength - 1) / 2];
         }
+
+        this._time.offset = Math.max(Math.min(timeOffset, Network.MAX_TIME_OFFSET), -Network.MAX_TIME_OFFSET);
     }
 
     /* Signaling */
