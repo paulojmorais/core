@@ -173,6 +173,30 @@ class WsPeerAddress extends PeerAddress {
             + /*port*/ 2;
     }
 
+     /**
+     * @returns {boolean}
+     * @private
+     */
+    exceedsAge() {
+        // Seed addresses are never too old.
+        if (this.isSeed()) {
+            return false;
+        }
+
+        const age = Date.now() - peerAddress.timestamp;
+        switch (this.protocol) {
+            case Protocol.WS:
+                return age > PeerAddressBook.MAX_AGE_WEBSOCKET;
+
+            case Protocol.RTC:
+                return age > PeerAddressBook.MAX_AGE_WEBRTC;
+
+            case Protocol.DUMB:
+                return age > PeerAddressBook.MAX_AGE_DUMB;
+        }
+        return false;
+    }
+
     /**
      * @override
      * @param {PeerAddress|*} o

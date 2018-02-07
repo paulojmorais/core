@@ -1,7 +1,7 @@
 class NetworkAgent extends Observable {
     /**
      * @param {IBlockchain} blockchain
-     * @param {PeerAddresses} addresses
+     * @param {PeerAddressBook} addresses
      * @param {NetworkConfig} netconfig
      * @param {PeerChannel} channel
      *
@@ -12,12 +12,12 @@ class NetworkAgent extends Observable {
      * @listens PeerChannel#pong
      * @listens PeerChannel#close
      */
-    constructor(blockchain, addresses, netconfig, channel) {
+    constructor(blockchain, addressBook, netconfig, channel) {
         super();
         /** @type {IBlockchain} */
         this._blockchain = blockchain;
-        /** @type {PeerAddresses} */
-        this._addresses = addresses;
+        /** @type {PeerAddressBook} */
+        this._addressBook = addressBook;
         /** @type {NetworkConfig} */
         this._netconfig = netconfig;
         /** @type {PeerChannel} */
@@ -89,7 +89,7 @@ class NetworkAgent extends Observable {
         // the peer knows is older than RELAY_THROTTLE, relay the address again.
         const filteredAddresses = addresses.filter(addr => {
             // Exclude RTC addresses that are already at MAX_DISTANCE.
-            if (addr.protocol === Protocol.RTC && addr.distance >= PeerAddresses.MAX_DISTANCE) {
+            if (addr.protocol === Protocol.RTC && addr.distance >= PeerAddressBook.MAX_DISTANCE) {
                 return false;
             }
 
@@ -195,7 +195,7 @@ class NetworkAgent extends Observable {
         const peerAddress = msg.peerAddress;
         if (!peerAddress.netAddress) {
             /** @type {PeerAddress} */
-            const storedAddress = this._addresses.get(peerAddress);
+            const storedAddress = this._addressBook.addressList.getPeerAddress(peerAddress);
             if (storedAddress && storedAddress.netAddress) {
                 peerAddress.netAddress = storedAddress.netAddress;
             }
@@ -276,7 +276,7 @@ class NetworkAgent extends Observable {
         }
 
         // Put the new addresses in the address pool.
-        await this._addresses.add(this._channel, msg.addresses);
+        await this._addressBook.add(this._channel, msg.addresses);
 
         // Tell listeners that we have received new addresses.
         this.fire('addr', msg.addresses, this);
@@ -294,11 +294,11 @@ class NetworkAgent extends Observable {
         }
 
         // Find addresses that match the given serviceMask.
-        const addresses = this._addresses.query(msg.protocolMask, msg.serviceMask);
+        const addresses = this._addressBook.query(msg.protocolMask, msg.serviceMask);
 
         const filteredAddresses = addresses.filter(addr => {
             // Exclude RTC addresses that are already at MAX_DISTANCE.
-            if (addr.protocol === Protocol.RTC && addr.distance >= PeerAddresses.MAX_DISTANCE) {
+            if (addr.protocol === Protocol.RTC && addr.distance >= PeerAddressBook.MAX_DISTANCE) {
                 return false;
             }
 
