@@ -15,17 +15,17 @@ class PeerAddresses extends Observable {
         this._store = new HashSet();
 
         /**
-         * Map from signalIds to RTC peerAddresses.
-         * @type {HashMap.<SignalId,PeerAddressState>}
+         * Map from peerIds to RTC peerAddresses.
+         * @type {HashMap.<PeerId,PeerAddressState>}
          * @private
          */
-        this._signalIds = new HashMap();
+        this._peerIds = new HashMap();
 
         /**
          * @type {NetworkConfig}
          * @private
          */
-        this._netconfig = netconfig;
+        this._networkConfig = netconfig;
 
         // Number of WebSocket/WebRTC peers.
         /** @type {number} */
@@ -94,7 +94,7 @@ class PeerAddresses extends Observable {
         const peerAddress = peerAddressState.peerAddress;
 
         // Filter addresses that we cannot connect to.
-        if (!NetworkConfig.canConnect(peerAddress.protocol)) {
+        if (!this._networkConfig.canConnect(peerAddress.protocol)) {
             return -1;
         }
 
@@ -117,7 +117,8 @@ class PeerAddresses extends Observable {
                 return score;
 
             case PeerAddressState.FAILED:
-                return (1 - (peerAddressState.failedAttempts / peerAddressState.maxFailedAttempts)) * score;
+                // Don't pick failed addresses when they have failed the maximum number of times.
+                return (1 - ((peerAddressState.failedAttempts + 1) / peerAddressState.maxFailedAttempts)) * score;
 
             default:
                 return -1;
@@ -168,21 +169,21 @@ class PeerAddresses extends Observable {
     }
 
     /**
-     * @param {SignalId} signalId
+     * @param {PeerId} peerId
      * @returns {PeerAddress|null}
      */
-    getBySignalId(signalId) {
+    getByPeerId(peerId) {
         /** @type {PeerAddressState} */
-        const peerAddressState = this._signalIds.get(signalId);
+        const peerAddressState = this._peerIds.get(peerId);
         return peerAddressState ? peerAddressState.peerAddress : null;
     }
 
     /**
-     * @param {SignalId} signalId
+     * @param {PeerId} peerId
      * @returns {PeerChannel}
      */
-    getChannelBySignalId(signalId) {
-        const peerAddressState = this._signalIds.get(signalId);
+    getChannelByPeerId(peerId) {
+        const peerAddressState = this._peerIds.get(peerId);
         if (peerAddressState && peerAddressState.bestRoute) {
             return peerAddressState.bestRoute.signalChannel;
         }
@@ -276,7 +277,7 @@ class PeerAddresses extends Observable {
      */
     _add(channel, peerAddress) {
         // Ignore our own address.
-        if (this._netconfig.peerAddress.equals(peerAddress)) {
+        if (this._networkConfig.peerAddress.equals(peerAddress)) {
             return false;
         }
 
@@ -338,8 +339,8 @@ class PeerAddresses extends Observable {
             peerAddressState = new PeerAddressState(peerAddress);
             this._store.add(peerAddressState);
             if (peerAddress.protocol === Protocol.RTC) {
-                // Index by signalId.
-                this._signalIds.put(peerAddress.signalId, peerAddressState);
+                // Index by peerId.
+                this._peerIds.put(peerAddress.peerId, peerAddressState);
             }
         }
 
@@ -402,7 +403,7 @@ class PeerAddresses extends Observable {
             peerAddressState = new PeerAddressState(peerAddress);
 
             if (peerAddress.protocol === Protocol.RTC) {
-                this._signalIds.put(peerAddress.signalId, peerAddressState);
+                this._peerIds.put(peerAddress.peerId, peerAddressState);
             }
 
             this._store.add(peerAddressState);
@@ -430,6 +431,7 @@ class PeerAddresses extends Observable {
         peerAddressState.state = PeerAddressState.CONNECTED;
         peerAddressState.lastConnected = Date.now();
         peerAddressState.failedAttempts = 0;
+        peerAddressState.bannedUntil = -1;
         peerAddressState.banBackoff = PeerAddresses.INITIAL_FAILED_BACKOFF;
 
         peerAddressState.peerAddress = peerAddress;
@@ -506,7 +508,7 @@ class PeerAddresses extends Observable {
             if (peerAddressState.banBackoff >= PeerAddresses.MAX_FAILED_BACKOFF) {
                 this._remove(peerAddress);
             } else {
-                this.ban(peerAddress, peerAddressState.banBackoff);
+                peerAddressState.bannedUntil = Date.now() + peerAddressState.banBackoff;
                 peerAddressState.banBackoff = Math.min(PeerAddresses.MAX_FAILED_BACKOFF, peerAddressState.banBackoff * 2);
             }
         }
@@ -605,9 +607,9 @@ class PeerAddresses extends Observable {
             return;
         }
 
-        // Delete from signalId index.
+        // Delete from peerId index.
         if (peerAddress.protocol === Protocol.RTC) {
-            this._signalIds.remove(peerAddress.signalId);
+            this._peerIds.remove(peerAddress.peerId);
         }
 
         if (peerAddressState.state === PeerAddressState.CONNECTING) {
@@ -683,6 +685,16 @@ class PeerAddresses extends Observable {
                         Log.d(PeerAddresses, `Deleting old peer address ${addr}`);
                         this._remove(addr);
                     }
+
+                    // Reset failed attempts after bannedUntil has expired.
+                    if (peerAddressState.state === PeerAddressState.FAILED
+                        && peerAddressState.failedAttempts >= peerAddressState.maxFailedAttempts
+                        && peerAddressState.bannedUntil > 0 && peerAddressState.bannedUntil <= now) {
+
+                        peerAddressState.bannedUntil = -1;
+                        peerAddressState.failedAttempts = 0;
+                    }
+
                     break;
 
                 case PeerAddressState.BANNED:
@@ -786,7 +798,7 @@ PeerAddresses.SEED_PEERS = [
     // WsPeerAddress.seed('seed3.nimiq-network.com', 8080),
     // WsPeerAddress.seed('seed4.nimiq-network.com', 8080),
     // WsPeerAddress.seed('emily.nimiq-network.com', 443)
-    WsPeerAddress.seed('dev.nimiq-network.com', 8080)
+    WsPeerAddress.seed('dev.nimiq-network.com', 8080, 'a6368d731eb7f03a0c01403828ab9fb1')
 ];
 Class.register(PeerAddresses);
 

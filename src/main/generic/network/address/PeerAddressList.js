@@ -11,11 +11,11 @@ class PeerAddressList {
         this._store = new HashMap();
 
         /**
-         * Map from signalIds to RTC peerAddresses.
-         * @type {HashMap.<SignalId,PeerAddressState>}
+         * Map from peerIds to RTC peerAddresses.
+         * @type {HashMap.<PeerId,PeerAddressState>}
          * @private
          */
-        this._signalIds = new HashMap();
+        this._peerIds = new HashMap();
 
         // Number of WebSocket/WebRTC peers.
         /** @type {number} */
@@ -74,36 +74,36 @@ class PeerAddressList {
     }
 
      /**
-     * @param {SignalId} signalId
+     * @param {PeerId} peerId
      * @param {PeerAddressState} peerAddressState
      */
-    putSignalId(peerAddressState) {
-        this._signalIds.put(signalId, peerAddressState);
+    putPeerId(peerAddressState) {
+        this._peerIds.put(peerId, peerAddressState);
     }
 
     /**
-     * @param {SignalId} signalId
+     * @param {PeerId} peerId
      */
-    removeSignalId(signalId) {
-        this._signalIds.remove(signalId);
+    removePeerId(peerId) {
+        this._peerIds.remove(peerId);
     }
 
     /**
-     * @param {SignalId} signalId
+     * @param {PeerId} peerId
      * @returns {PeerAddress|null}
      */
-    getBySignalId(signalId) {
+    getByPeerId(peerId) {
         /** @type {PeerAddressState} */
-        const peerAddressState = this._signalIds.get(signalId);
+        const peerAddressState = this._peerIds.get(peerId);
         return peerAddressState ? peerAddressState.peerAddress : null;
     }
 
     /**
-     * @param {SignalId} signalId
+     * @param {PeerId} peerId
      * @returns {PeerChannel}
      */
-    getChannelBySignalId(signalId) {
-        const peerAddressState = this._signalIds.get(signalId);
+    getChannelByPeerId(peerId) {
+        const peerAddressState = this._peerIds.get(peerId);
         if (peerAddressState && peerAddressState.bestRoute) {
             return peerAddressState.bestRoute.signalChannel;
         }

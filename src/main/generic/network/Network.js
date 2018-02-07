@@ -33,32 +33,37 @@ class Network extends Observable {
     }
 
     /**
+     * @constructor
      * @param {IBlockchain} blockchain
-     * @param {NetworkConfig} netconfig
+     * @param {NetworkConfig} networkConfig
      * @param {Time} time
-     * @return {Promise.<Network>}
-     */
-    constructor(blockchain, netconfig, time) {
-        super();
-        /** @type {IBlockchain} */
-        this._blockchain = blockchain;
-        /** @type {NetworkConfig} */
-        this._netconfig = netconfig;
-        /** @type {Time} */
-        this._time = time;
-        return this._init();
-    }
-
-    /**
      * @listens PeerAddressBook#added
      * @listens WebSocketConnector#connection
      * @listens WebSocketConnector#error
      * @listens WebRtcConnector#connection
      * @listens WebRtcConnector#error
-     * @return {Promise.<Network>}
-     * @private
      */
-    async _init() {
+    constructor(blockchain, networkConfig, time) {
+        super();
+
+        /**
+         * @type {IBlockchain}
+         * @private
+         */
+        this._blockchain = blockchain;
+
+        /**
+         * @type {NetworkConfig}
+         * @private
+         */
+        this._networkConfig = networkConfig;
+
+        /**
+         * @type {Time}
+         * @private
+         */
+        this._time = time;
+
         /**
          * Flag indicating whether we should actively connect to other peers
          * if our peer count is below PEER_COUNT_DESIRED.
@@ -95,12 +100,12 @@ class Network extends Observable {
         this._bytesReceived = 0;
 
         /** @type {WebSocketConnector} */
-        this._wsConnector = new WebSocketConnector(this._netconfig);
+        this._wsConnector = new WebSocketConnector(this._networkConfig);
         this._wsConnector.on('connection', conn => this._onConnection(conn));
         this._wsConnector.on('error', peerAddr => this._onError(peerAddr));
 
         /** @type {WebRtcConnector} */
-        this._rtcConnector = await new WebRtcConnector(this._netconfig);
+        this._rtcConnector = new WebRtcConnector(this._networkConfig);
         this._rtcConnector.on('connection', conn => this._onConnection(conn));
         this._rtcConnector.on('error', (peerAddr, reason) => this._onError(peerAddr, reason));
 
@@ -110,7 +115,7 @@ class Network extends Observable {
          * @type {PeerAddressBook}
          * @private
          */
-        this._addressBook = new PeerAddressBook(this._netconfig);
+        this._addressBook = new PeerAddressBook(this._networkConfig);
 
         // Relay new addresses to peers.
         this._addressBook.on('added', addresses => {
@@ -120,8 +125,6 @@ class Network extends Observable {
 
         /** @type {SignalStore} */
         this._forwards = new SignalStore();
-
-        return this;
     }
 
     connect() {
@@ -226,7 +229,7 @@ class Network extends Observable {
                 break;
 
             case Protocol.RTC: {
-                const signalChannel = this._addressBook.addressList.getChannelBySignalId(peerAddress.signalId);
+                const signalChannel = this._addressBook.addressList.getChannelByPeerId(peerAddress.peerId);
                 Log.d(Network, `Connecting to ${peerAddress} via ${signalChannel.peerAddress}...`);
                 if (this._rtcConnector.connect(peerAddress, signalChannel)) {
                     this._addressBook.connecting(peerAddress);
@@ -278,7 +281,7 @@ class Network extends Observable {
         channel.on('fail', reason => this._onFail(channel, reason));
 
         // Create network agent.
-        const agent = new NetworkAgent(this._blockchain, this._addressBook, this._netconfig, channel);
+        const agent = new NetworkAgent(this._blockchain, this._addressBook, this._networkConfig, channel);
         agent.on('handshake', peer => this._onHandshake(peer, agent));
         agent.on('close', (peer, channel, closedByRemote) => this._onClose(peer, channel, closedByRemote));
 
@@ -522,27 +525,27 @@ class Network extends Observable {
         }
 
         // Can be undefined for non-rtc nodes.
-        const mySignalId = this._netconfig.peerAddress.signalId;
+        const myPeerId = this._networkConfig.peerAddress.peerId;
 
         // Discard signals from myself.
-        if (msg.senderId.equals(mySignalId)) {
-            Log.w(Network, `Received signal from myself to ${msg.recipientId} from ${channel.peerAddress} (myId: ${mySignalId})`);
+        if (msg.senderId.equals(myPeerId)) {
+            Log.w(Network, `Received signal from myself to ${msg.recipientId} from ${channel.peerAddress} (myId: ${myPeerId})`);
             return;
         }
 
         // If the signal has the unroutable flag set and we previously forwarded a matching signal,
         // mark the route as unusable.
         if (msg.isUnroutable() && this._forwards.signalForwarded(/*senderId*/ msg.recipientId, /*recipientId*/ msg.senderId, /*nonce*/ msg.nonce)) {
-            const senderAddr = this._addressBook.addressList.getBySignalId(msg.senderId);
+            const senderAddr = this._addressBook.addressList.getByPeerId(msg.senderId);
             this._addressBook.unroutable(channel, senderAddr);
         }
 
         // If the signal is intended for us, pass it on to our WebRTC connector.
-        if (msg.recipientId.equals(mySignalId)) {
+        if (msg.recipientId.equals(myPeerId)) {
             // If we sent out a signal that did not reach the recipient because of TTL
             // or it was unroutable, delete this route.
             if (this._rtcConnector.isValidSignal(msg) && (msg.isUnroutable() || msg.isTtlExceeded())) {
-                const senderAddr = this._addressBook.addressList.getBySignalId(msg.senderId);
+                const senderAddr = this._addressBook.addressList.getByPeerId(msg.senderId);
                 this._addressBook.unroutable(channel, senderAddr);
             }
             this._rtcConnector.onSignal(channel, msg);
@@ -560,7 +563,7 @@ class Network extends Observable {
         }
 
         // Otherwise, try to forward the signal to the intended recipient.
-        const signalChannel = this._addressBook.addressList.getChannelBySignalId(msg.recipientId);
+        const signalChannel = this._addressBook.addressList.getChannelByPeerId(msg.recipientId);
         if (!signalChannel) {
             Log.d(Network, `Failed to forward signal from ${msg.senderId} to ${msg.recipientId} - no route found`);
             // If we don't know a route to the intended recipient, return signal to sender with unroutable flag set and payload removed.
@@ -657,8 +660,8 @@ class SignalStore {
     }
 
     /**
-     * @param {SignalId} senderId
-     * @param {SignalId} recipientId
+     * @param {PeerId} senderId
+     * @param {PeerId} recipientId
      * @param {number} nonce
      */
     add(senderId, recipientId, nonce) {
@@ -682,8 +685,8 @@ class SignalStore {
     }
 
     /**
-     * @param {SignalId} senderId
-     * @param {SignalId} recipientId
+     * @param {PeerId} senderId
+     * @param {PeerId} recipientId
      * @param {number} nonce
      * @return {boolean}
      */
@@ -693,8 +696,8 @@ class SignalStore {
     }
 
     /**
-     * @param {SignalId} senderId
-     * @param {SignalId} recipientId
+     * @param {PeerId} senderId
+     * @param {PeerId} recipientId
      * @param {number} nonce
      * @return {boolean}
      */
@@ -720,14 +723,14 @@ Class.register(SignalStore);
 
 class ForwardedSignal {
     /**
-     * @param {SignalId} senderId
-     * @param {SignalId} recipientId
+     * @param {PeerId} senderId
+     * @param {PeerId} recipientId
      * @param {number} nonce
      */
     constructor(senderId, recipientId, nonce) {
-        /** @type {SignalId} */
+        /** @type {PeerId} */
         this._senderId = senderId;
-        /** @type {SignalId} */
+        /** @type {PeerId} */
         this._recipientId = recipientId;
         /** @type {number} */
         this._nonce = nonce;

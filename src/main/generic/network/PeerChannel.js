@@ -84,10 +84,20 @@ class PeerChannel extends Observable {
     /**
      * @param {PeerAddress} peerAddress
      * @param {Hash} headHash
+     * @param {Uint8Array} challengeNonce
      * @return {boolean}
      */
-    version(peerAddress, headHash) {
-        return this._send(new VersionMessage(Version.CODE, peerAddress, Block.GENESIS.HASH, headHash));
+    version(peerAddress, headHash, challengeNonce) {
+        return this._send(new VersionMessage(Version.CODE, peerAddress, Block.GENESIS.HASH, headHash, challengeNonce));
+    }
+
+    /**
+     * @param {PublicKey} publicKey
+     * @param {Signature} signature
+     * @returns {boolean}
+     */
+    verack(publicKey, signature) {
+        return this._send(new VerAckMessage(publicKey, signature));
     }
 
     /**
@@ -217,8 +227,8 @@ class PeerChannel extends Observable {
     }
 
     /**
-     * @param {SignalId} senderId
-     * @param {SignalId} recipientId
+     * @param {PeerId} senderId
+     * @param {PeerId} recipientId
      * @param {number} nonce
      * @param {number} ttl
      * @param {SignalMessage.Flags|number} flags
@@ -406,3 +416,4 @@ PeerChannel.Event[Message.Type.GET_TRANSACTIONS_PROOF] = 'get-transactions-proof
 PeerChannel.Event[Message.Type.TRANSACTIONS_PROOF] = 'transactions-proof';
 PeerChannel.Event[Message.Type.GET_TRANSACTION_RECEIPTS] = 'get-transaction-receipts';
 PeerChannel.Event[Message.Type.TRANSACTION_RECEIPTS] = 'transaction-receipts';
+PeerChannel.Event[Message.Type.VERACK] = 'verack';

@@ -2,13 +2,15 @@ class PeerAddressScoring {
     /**
      * @constructor
      * @param {PeerAddressList} addressList
+     * @param {NetworkConfig} networkConfig
      */
-    constructor(addressList) {
+    constructor(addressList, networkConfig) {
         /**
          * @private
          * @type {PeerAddressList}
          */
         this._addressList = addressList;
+        this._networkConfig = networkConfig;
     }
 
     /**
@@ -56,7 +58,7 @@ class PeerAddressScoring {
         const peerAddress = peerAddressState.peerAddress;
 
         // Filter addresses that we cannot connect to.
-        if (!NetworkConfig.canConnect(peerAddress.protocol)) {
+        if (!this._networkConfig.canConnect(peerAddress.protocol)) {
             return -1;
         }
 

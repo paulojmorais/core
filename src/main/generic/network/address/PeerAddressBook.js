@@ -2,16 +2,16 @@
 class PeerAddressBook extends Observable {
     /**
      * @constructor
-     * @param {NetworkConfig} netconfig
+     * @param {NetworkConfig} networkConfig
      */
-    constructor(netconfig) {
+    constructor(networkConfig) {
         super();
 
          /**
          * @type {NetworkConfig}
          * @private
          */
-        this._netconfig = netconfig;
+        this._networkConfig = networkConfig;
 
         /**
          * List services for peer addresses
@@ -25,7 +25,7 @@ class PeerAddressBook extends Observable {
          * @type {PeerAddressScoring}
          * @private
          */
-        this._examiner = new PeerAddressScoring(this._addressList);
+        this._examiner = new PeerAddressScoring(this._addressList, this._networkConfig);
 
         // Init seed peers.
         this.add(/*channel*/ null, PeerAddressBook.SEED_PEERS);
@@ -114,7 +114,7 @@ class PeerAddressBook extends Observable {
      */
     _add(channel, peerAddress) {
         // Ignore our own address.
-        if (this._netconfig.peerAddress.equals(peerAddress)) {
+        if (this._networkConfig.peerAddress.equals(peerAddress)) {
             return false;
         }
 
@@ -176,8 +176,8 @@ class PeerAddressBook extends Observable {
             peerAddressState = new PeerAddressState(peerAddress);
             this._addressList.add(peerAddressState);
             if (peerAddress.protocol === Protocol.RTC) {
-                // Index by signalId.
-                this._addressList.putSignalId.put(peerAddress.signalId, peerAddressState);
+                // Index by peerId.
+                this._addressList.putPeerId.put(peerAddress.peerId, peerAddressState);
             }
         }
 
@@ -303,9 +303,9 @@ class PeerAddressBook extends Observable {
             return;
         }
 
-        // Delete from signalId index.
+        // Delete from peerId index.
         if (peerAddress.protocol === Protocol.RTC) {
-            this._addressList.removeSignalId(peerAddress.signalId);
+            this._addressList.removePeerId(peerAddress.peerId);
         }
 
         if (peerAddressState.state === PeerAddressState.CONNECTING) {
@@ -431,7 +431,7 @@ class PeerAddressBook extends Observable {
                 peerAddressState = new PeerAddressState(peerAddress);
     
                 if (peerAddress.protocol === Protocol.RTC) {
-                    this._addressList.putSignalId(peerAddress.signalId, peerAddressState);
+                    this._addressList.putPeerId(peerAddress.peerId, peerAddressState);
                 }
     
                 this._addressList.add(peerAddressState);

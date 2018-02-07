@@ -96,6 +96,15 @@ class PartialLightChain extends LightChain {
             return false;
         }
 
+        // Check that the dense suffix of the prefix is long enough.
+        // The paper doesn't require this, we however need a sufficiently long dense suffix
+        // to be able to verify block difficulties.
+        const denseSuffix = proof.prefix.denseSuffix();
+        if (denseSuffix.length < Policy.M && proof.prefix.length > 0 && proof.prefix.head.height >= Policy.M) {
+            Log.w(NanoChain, 'Rejecting proof - dense suffix too short');
+            return false;
+        }
+
         // Compute and verify interlinks for the suffix.
         const suffixBlocks = [];
         let head = proof.prefix.head;
@@ -411,7 +420,7 @@ class PartialLightChain extends LightChain {
      */
     async _prepend(blockHash, chainData) {
         try {
-            const transactionCache = new TransactionCache(chainData.head.transactions);
+            const transactionCache = new TransactionCache();
             await this._accountsTx.revertBlock(chainData.head, transactionCache);
         } catch (e) {
             // AccountsHash mismatch. This can happen if someone gives us an invalid block.
@@ -448,7 +457,7 @@ class PartialLightChain extends LightChain {
         // If we're done, prepare next phase.
         if (result === PartialAccountsTree.Status.OK_COMPLETE) {
             this._state = PartialLightChain.State.PROVE_BLOCKS;
-            this._accountsTx = new Accounts(await this._partialTree.transaction(false));
+            this._accountsTx = new Accounts(this._partialTree.transaction(false));
         }
 
         return result;
