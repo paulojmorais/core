@@ -793,10 +793,9 @@ PeerAddresses.SEED_PEERS = [
     // WsPeerAddress.seed('seed3.nimiq-network.com', 8080),
     // WsPeerAddress.seed('seed4.nimiq-network.com', 8080),
     // WsPeerAddress.seed('emily.nimiq-network.com', 443)
-    WsPeerAddress.seed('bug-bounty1.nimiq-network.com', 8080),
-    WsPeerAddress.seed('bug-bounty2.nimiq-network.com', 8080),
-    WsPeerAddress.seed('bug-bounty3.nimiq-network.com', 8080),
-    WsPeerAddress.seed('bug-bounty4.nimiq-network.com', 8080)
+    WsPeerAddress.seed('bug-bounty1.nimiq-network.com', 8080, '7e825872ee12a71bda50cba9f230c760c84ee50eef0a3e435467e8d5307c0b4e'),
+    WsPeerAddress.seed('bug-bounty2.nimiq-network.com', 8080, 'ea876175c8b693c0db38b7c17d66e9c510020fceb4634f04e281af30438f8787'),
+    WsPeerAddress.seed('bug-bounty3.nimiq-network.com', 8080, '5c0d5d801e85ebd42f25a45b2cb7f3b39b9ce14002d4662f5ed0cd79ce25165a')
 ];
 Class.register(PeerAddresses);
 
