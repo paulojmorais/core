@@ -3,6 +3,32 @@ class Consensus {
      * @param {NetworkConfig} [netconfig]
      * @return {Promise.<FullConsensus>}
      */
+    static async volatile(netconfig = NetworkConfig.getDefault()) {
+        await Crypto.prepareSyncCryptoWorker();
+
+        netconfig.services = new Services(Services.FULL, Services.FULL);
+        await netconfig.initVolatile();
+
+        /** @type {Time} */
+        const time = new Time();
+        /** @type {Accounts} */
+        const accounts = await Accounts.createVolatile();
+        /** @type {TransactionStore} */
+        const transactionStore = await TransactionStore.createVolatile();
+        /** @type {FullChain} */
+        const blockchain = await FullChain.createVolatile(accounts, time, transactionStore);
+        /** @type {Mempool} */
+        const mempool = new Mempool(blockchain, accounts);
+        /** @type {Network} */
+        const network = new Network(blockchain, netconfig, time);
+
+        return new FullConsensus(blockchain, mempool, network);
+    }
+
+    /**
+     * @param {NetworkConfig} [netconfig]
+     * @return {Promise.<FullConsensus>}
+     */
     static async full(netconfig = NetworkConfig.getDefault()) {
         await Crypto.prepareSyncCryptoWorker();
 
