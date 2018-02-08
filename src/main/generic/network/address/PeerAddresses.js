@@ -160,11 +160,24 @@ class PeerAddresses extends Observable {
 
     /**
      * @param {PeerAddress} peerAddress
+     * @returns {?PeerAddressState}
+     * @private
+     */
+    _get(peerAddress) {
+        if (peerAddress instanceof WsPeerAddress) {
+            const localPeerAddress = this._store.get(peerAddress.withoutId());
+            if (localPeerAddress) return localPeerAddress;
+        }
+        return this._store.get(peerAddress);
+    }
+
+    /**
+     * @param {PeerAddress} peerAddress
      * @returns {PeerAddress|null}
      */
     get(peerAddress) {
         /** @type {PeerAddressState} */
-        const peerAddressState = this._store.get(peerAddress);
+        const peerAddressState = this._get(peerAddress);
         return peerAddressState ? peerAddressState.peerAddress : null;
     }
 
@@ -226,7 +239,6 @@ class PeerAddresses extends Observable {
 
             // Update timestamp for connected peers.
             if (peerAddressState.state === PeerAddressState.CONNECTED) {
-                address.timestamp = now;
                 // Also update timestamp for RTC connections
                 if (peerAddressState.bestRoute) {
                     peerAddressState.bestRoute.timestamp = now;
@@ -302,7 +314,7 @@ class PeerAddresses extends Observable {
             if (peerAddress.distance > PeerAddresses.MAX_DISTANCE) {
                 Log.d(PeerAddresses, `Ignoring address ${peerAddress} - max distance exceeded`);
                 // Drop any route to this peer over the current channel. This may prevent loops.
-                const peerAddressState = this._store.get(peerAddress);
+                const peerAddressState = this._get(peerAddress);
                 if (peerAddressState) {
                     peerAddressState.deleteRoute(channel);
                 }
@@ -311,7 +323,7 @@ class PeerAddresses extends Observable {
         }
 
         // Check if we already know this address.
-        let peerAddressState = this._store.get(peerAddress);
+        let peerAddressState = this._get(peerAddress);
         if (peerAddressState) {
             const knownAddress = peerAddressState.peerAddress;
 
@@ -320,9 +332,9 @@ class PeerAddresses extends Observable {
                 return false;
             }
 
-            // Never update the timestamp of seed peers.
+            // Never update seed peers.
             if (knownAddress.isSeed()) {
-                peerAddress.timestamp = 0;
+                return false;
             }
 
             // Never erase NetAddresses.
@@ -349,15 +361,6 @@ class PeerAddresses extends Observable {
             peerAddressState.addRoute(channel, peerAddress.distance, peerAddress.timestamp);
         }
 
-        // If we are currently connected, allow only updates to the netAddress and only if we don't know it yet.
-        if (peerAddressState.state === PeerAddressState.CONNECTED) {
-            if (!peerAddressState.peerAddress.netAddress && peerAddress.netAddress) {
-                peerAddressState.peerAddress.netAddress = peerAddress.netAddress;
-            }
-
-            return false;
-        }
-
         // Update the address.
         peerAddressState.peerAddress = peerAddress;
 
@@ -370,7 +373,7 @@ class PeerAddresses extends Observable {
      * @returns {void}
      */
     connecting(peerAddress) {
-        const peerAddressState = this._store.get(peerAddress);
+        const peerAddressState = this._get(peerAddress);
         if (!peerAddressState) {
             return;
         }
@@ -397,7 +400,7 @@ class PeerAddresses extends Observable {
      * @returns {void}
      */
     connected(channel, peerAddress) {
-        let peerAddressState = this._store.get(peerAddress);
+        let peerAddressState = this._get(peerAddress);
         
         if (!peerAddressState) {
             peerAddressState = new PeerAddressState(peerAddress);
@@ -407,11 +410,6 @@ class PeerAddresses extends Observable {
             }
 
             this._store.add(peerAddressState);
-        } else {
-            // Never update the timestamp of seed peers.
-            if (peerAddressState.peerAddress.isSeed()) {
-                peerAddress.timestamp = 0;
-            }
         }
 
         if (peerAddressState.state === PeerAddressState.BANNED
@@ -435,7 +433,6 @@ class PeerAddresses extends Observable {
         peerAddressState.banBackoff = PeerAddresses.INITIAL_FAILED_BACKOFF;
 
         peerAddressState.peerAddress = peerAddress;
-        peerAddressState.peerAddress.timestamp = Date.now();
 
         // Add route.
         if (peerAddress.protocol === Protocol.RTC) {
@@ -451,7 +448,7 @@ class PeerAddresses extends Observable {
      * @returns {void}
      */
     disconnected(channel, peerAddress, closedByRemote) {
-        const peerAddressState = this._store.get(peerAddress);
+        const peerAddressState = this._get(peerAddress);
         if (!peerAddressState) {
             return;
         }
@@ -489,7 +486,7 @@ class PeerAddresses extends Observable {
      * @returns {void}
      */
     failure(peerAddress) {
-        const peerAddressState = this._store.get(peerAddress);
+        const peerAddressState = this._get(peerAddress);
         if (!peerAddressState) {
             return;
         }
@@ -525,7 +522,7 @@ class PeerAddresses extends Observable {
             return;
         }
 
-        const peerAddressState = this._store.get(peerAddress);
+        const peerAddressState = this._get(peerAddress);
         if (!peerAddressState) {
             return;
         }
@@ -547,7 +544,7 @@ class PeerAddresses extends Observable {
      * @returns {void}
      */
     ban(peerAddress, duration = PeerAddresses.DEFAULT_BAN_TIME) {
-        let peerAddressState = this._store.get(peerAddress);
+        let peerAddressState = this._get(peerAddress);
         if (!peerAddressState) {
             peerAddressState = new PeerAddressState(peerAddress);
             this._store.add(peerAddressState);
@@ -571,7 +568,7 @@ class PeerAddresses extends Observable {
      * @returns {boolean}
      */
     isConnected(peerAddress) {
-        const peerAddressState = this._store.get(peerAddress);
+        const peerAddressState = this._get(peerAddress);
         return peerAddressState && peerAddressState.state === PeerAddressState.CONNECTED;
     }
 
@@ -580,7 +577,7 @@ class PeerAddresses extends Observable {
      * @returns {boolean}
      */
     isBanned(peerAddress) {
-        const peerAddressState = this._store.get(peerAddress);
+        const peerAddressState = this._get(peerAddress);
         return peerAddressState
             && peerAddressState.state === PeerAddressState.BANNED
             // XXX Never consider seed peers to be banned. This allows us to use
@@ -596,7 +593,7 @@ class PeerAddresses extends Observable {
      * @private
      */
     _remove(peerAddress) {
-        const peerAddressState = this._store.get(peerAddress);
+        const peerAddressState = this._get(peerAddress);
         if (!peerAddressState) {
             return;
         }
@@ -714,8 +711,6 @@ class PeerAddresses extends Observable {
                     break;
 
                 case PeerAddressState.CONNECTED:
-                    // Keep timestamp up-to-date while we are connected.
-                    addr.timestamp = now;
                     // Also update timestamp for RTC connections
                     if (peerAddressState.bestRoute) {
                         peerAddressState.bestRoute.timestamp = now;
@@ -798,7 +793,7 @@ PeerAddresses.SEED_PEERS = [
     // WsPeerAddress.seed('seed3.nimiq-network.com', 8080),
     // WsPeerAddress.seed('seed4.nimiq-network.com', 8080),
     // WsPeerAddress.seed('emily.nimiq-network.com', 443)
-    WsPeerAddress.seed('dev.nimiq-network.com', 8080, 'a6368d731eb7f03a0c01403828ab9fb1')
+    WsPeerAddress.seed('dev.nimiq-network.com', 8080)
 ];
 Class.register(PeerAddresses);
 
