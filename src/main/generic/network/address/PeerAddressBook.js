@@ -418,15 +418,15 @@ class PeerAddressBook extends Observable {
         let peerAddressState = this._addressList.get(peerAddress);
 
         // Handling the absence of a peerAddressState
-        if ([PeerAddressBook.connecting,
-            PeerAddressBook.disconnected,
-            PeerAddressBook.failure,
-            PeerAddressBook.unroutable].includes(caller)) {
+        if ([PeerAddressBook.prototype.connecting,
+            PeerAddressBook.prototype.disconnected,
+            PeerAddressBook.prototype.failure,
+            PeerAddressBook.prototype.unroutable].includes(caller)) {
             if (!peerAddressState) {
                 return null;
             }
         }
-        else if (PeerAddressBook.connected === caller) {
+        else if (PeerAddressBook.prototype.connected === caller) {
             if (!peerAddressState) {
                 peerAddressState = new PeerAddressState(peerAddress);
     
@@ -442,7 +442,7 @@ class PeerAddressBook extends Observable {
                 }
             }    
         }
-        else if (PeerAddressBook.ban == caller) {
+        else if (PeerAddressBook.prototype.ban == caller) {
             if (!peerAddressState) {
                 peerAddressState = new PeerAddressState(peerAddress);
                 this._addressList.add(peerAddressState);
@@ -450,7 +450,7 @@ class PeerAddressBook extends Observable {
         }
  
         // Disconnect channel
-        if ([PeerAddressBook.disconnected].includes(caller)) {
+        if ([PeerAddressBook.prototype.disconnected].includes(caller)) {
             if (payload.channel) {
                 this._removeBySignalChannel(payload.channel);
             }
@@ -463,14 +463,14 @@ class PeerAddressBook extends Observable {
         }
 
         // Individual additional behaviour
-        if ([PeerAddressBook.ban].includes(caller)) {
+        if ([PeerAddressBook.prototype.ban].includes(caller)) {
             peerAddressState.bannedUntil = Date.now() + payload.duration ? payload.duration : 0;
 
             // Drop all routes to this peer.
             peerAddressState.deleteAllRoutes();
         }
 
-        if ([PeerAddressBook.disconnected].includes(caller)) {
+        if ([PeerAddressBook.prototype.disconnected].includes(caller)) {
             // XXX Immediately delete address if the remote host closed the connection.
             // Also immediately delete dumb clients, since we cannot connect to those anyway.
             if ((payload.channel.closedByRemote && PlatformUtils.isOnline()) || peerAddressState.peerAddress.protocol === Protocol.DUMB) {
@@ -478,7 +478,7 @@ class PeerAddressBook extends Observable {
             }
         }
 
-        if ([PeerAddressBook.unroutable].includes(caller)) {
+        if ([PeerAddressBook.prototype.unroutable].includes(caller)) {
             if (!peerAddressState.bestRoute || (payload.channel && !peerAddressState.bestRoute.signalChannel.equals(payload.channel))) {
                 Log.w(PeerAddressBook, `Got unroutable for ${peerAddress} on a channel other than the best route.`);
                 return;

@@ -235,7 +235,7 @@ class WsPeerAddress extends PeerAddress {
             return false;
         }
 
-        const age = Date.now() - peerAddress.timestamp;
+        const age = Date.now() - this.timestamp;
         switch (this.protocol) {
             case Protocol.WS:
                 return age > PeerAddressBook.MAX_AGE_WEBSOCKET;

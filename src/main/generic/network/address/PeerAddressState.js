@@ -170,17 +170,17 @@ class PeerAddressState {
     reduce(caller, addressList) {
         // Break or exceptions on current state BANNED or CONNECTED
         if (this.state === PeerAddressState.BANNED) {
-            if ([PeerAddressBook.connecting,
-                PeerAddressBook.disconnected,
-                PeerAddressBook.failure].includes(caller)) {
+            if ([PeerAddressBook.prototype.connecting,
+                PeerAddressBook.prototype.disconnected,
+                PeerAddressBook.prototype.failure].includes(caller)) {
                 return null;
             };
 
-            if ([PeerAddressBook.connecting].includes(caller)) {
+            if ([PeerAddressBook.prototype.connecting].includes(caller)) {
                 throw 'Connecting to banned address';
             };
 
-            if ([PeerAddressBook.connected].includes(caller)) {
+            if ([PeerAddressBook.prototype.connected].includes(caller)) {
                 // Allow recovering seed peer's inbound connection to succeed.
                 if (!this.peerAddress.isSeed()) {
     
@@ -188,63 +188,63 @@ class PeerAddressState {
             }
         }
 
-        if ([PeerAddressBook.connecting].includes(caller)) {
+        if ([PeerAddressBook.prototype.connecting].includes(caller)) {
             if (this.state === PeerAddressState.CONNECTED) {
                 throw `Duplicate connection to ${peerAddress}`;
             }
         }
 
         // Control addresslist's connectingCount
-        if ([PeerAddressBook.connecting].includes(caller)) {
+        if ([PeerAddressBook.prototype.connecting].includes(caller)) {
             if (this.state !== PeerAddressState.CONNECTING) {
                 addressList._connectingCount++;
             }
         }
 
-        if ([PeerAddressBook.connected,
-            PeerAddressBook.disconnected,
-            PeerAddressBook.failure,
-            PeerAddressBook.ban].includes(caller)) {
+        if ([PeerAddressBook.prototype.connected,
+            PeerAddressBook.prototype.disconnected,
+            PeerAddressBook.prototype.failure,
+            PeerAddressBook.prototype.ban].includes(caller)) {
             if (this.state === PeerAddressState.CONNECTING) {
                 addressList._connectingCount--;
             }
         }
 
         // Control addresslist's connected counts
-        if ([PeerAddressBook.connected].includes(caller)) {
+        if ([PeerAddressBook.prototype.connected].includes(caller)) {
             if (this.state !== PeerAddressState.CONNECTED) {
                 addressList._updateConnectedPeerCount(this.peerAddress, 1);
             }
         }
 
-        if ([PeerAddressBook.disconnected,
-            PeerAddressBook.ban].includes(caller)) {
+        if ([PeerAddressBook.prototype.disconnected,
+            PeerAddressBook.prototype.ban].includes(caller)) {
             if (this.state === PeerAddressState.CONNECTED) {
                 addressList._updateConnectedPeerCount(this.peerAddress, -1);
             }
         }
 
         // Set state
-        if ([PeerAddressBook.connecting,
-            PeerAddressBook.connected,
-            PeerAddressBook.disconnected,
-            PeerAddressBook.failure,
-            PeerAddressBook.ban].includes(caller)) {
+        if ([PeerAddressBook.prototype.connecting,
+            PeerAddressBook.prototype.connected,
+            PeerAddressBook.prototype.disconnected,
+            PeerAddressBook.prototype.failure,
+            PeerAddressBook.prototype.ban].includes(caller)) {
                 let nextState;
                 switch (caller) {
-                    case PeerAddressBook.connecting:
+                    case PeerAddressBook.prototype.connecting:
                         nextState = PeerAddressState.CONNECTING;
                         break;
-                    case PeerAddressBook.connected:
+                    case PeerAddressBook.prototype.connected:
                         nextState = PeerAddressState.CONNECTED;
                         break;
-                    case PeerAddressBook.disconnected:
+                    case PeerAddressBook.prototype.disconnected:
                         nextState = PeerAddressState.TRIED;
                         break;
-                    case PeerAddressBook.failure:
+                    case PeerAddressBook.prototype.failure:
                         nextState = PeerAddressState.FAILED;
                         break;
-                    case PeerAddressBook.ban:
+                    case PeerAddressBook.prototype.ban:
                         nextState = PeerAddressState.BANNED;
                         break;
             
@@ -258,7 +258,7 @@ class PeerAddressState {
         }
 
         // Individual, additional behaviour
-        if ([PeerAddressBook.connected].includes(caller)) {
+        if ([PeerAddressBook.prototype.connected].includes(caller)) {
             this.lastConnected = Date.now();
             this.failedAttempts = 0;
             this.banBackoff = PeerAddressBook.INITIAL_FAILED_BACKOFF;
@@ -272,7 +272,7 @@ class PeerAddressState {
             }
         }
 
-        if ([PeerAddressBook.failure].includes(caller)) {
+        if ([PeerAddressBook.prototype.failure].includes(caller)) {
             this.failedAttempts++;
 
             if (this.failedAttempts >= this.maxFailedAttempts) {
