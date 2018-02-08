@@ -494,7 +494,7 @@ class PeerAddressBook extends Observable {
                 if (peerAddressState.banBackoff >= PeerAddressBook.MAX_FAILED_BACKOFF) {
                     peerAddressState._remove(peerAddress);
                 } else {
-                    peerAddressState.ban(peerAddress, peerAddressState.banBackoff);
+                    peerAddressState.bannedUntil = Date.now() + peerAddressState.banBackoff;
                     peerAddressState.banBackoff = Math.min(PeerAddressBook.MAX_FAILED_BACKOFF, peerAddressState.banBackoff * 2);
                 }
             }
