@@ -135,7 +135,6 @@ const sources = {
         './src/main/generic/network/address/PeerAddressList.js',
         './src/main/generic/network/address/PeerAddressScoring.js',
         './src/main/generic/network/address/PeerAddressBook.js',
-        './src/main/generic/network/address/PeerId.js',
         './src/main/generic/network/message/Message.js',
         './src/main/generic/network/message/AddrMessage.js',
         './src/main/generic/network/message/BlockMessage.js',
@@ -410,7 +409,7 @@ gulp.task('sectest-babel', ['watch'], function () {
 gulp.task('eslint', function () {
     const eslint = require('gulp-eslint');
     return gulp.src(sources.all)
-        .pipe(eslint())
+        .pipe(eslint({quiet: true}))
         .pipe(eslint.format())
         .pipe(eslint.failAfterError());
 });

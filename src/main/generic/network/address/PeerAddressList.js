@@ -39,6 +39,19 @@ class PeerAddressList {
      */
     get(peerAddress) {
         /** @type {PeerAddressState} */
+        return this._get(peerAddress);
+    }
+
+    /**
+     * @param {PeerAddress} peerAddress
+     * @returns {?PeerAddressState}
+     * @private
+     */
+    _get(peerAddress) {
+        if (peerAddress instanceof WsPeerAddress) {
+            const localPeerAddress = this._store.get(peerAddress.withoutId());
+            if (localPeerAddress) return localPeerAddress;
+        }
         return this._store.get(peerAddress);
     }
 
@@ -77,7 +90,7 @@ class PeerAddressList {
      * @param {PeerId} peerId
      * @param {PeerAddressState} peerAddressState
      */
-    putPeerId(peerAddressState) {
+    putPeerId(peerId, peerAddressState) {
         this._peerIds.put(peerId, peerAddressState);
     }
 

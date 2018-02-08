@@ -58,20 +58,37 @@ class PeerAddressBook extends Observable {
         const addresses = [];
         for (const peerAddressState of this._addressList.values()) {
             // Never return banned or failed addresses.
-            // Never return seed peers.
-            // Only return addresses matching the protocol mask.
-            // Only return addresses matching the service mask.
-            if (!peerAddressState.isQueryable() || peerAddressState.state === PeerAddressState.FAILED) {
+            if (peerAddressState.state === PeerAddressState.BANNED
+                    || peerAddressState.state === PeerAddressState.FAILED) {
                 continue;
             }
 
-            // Update timestamp for connected peers. 
-            peerAddressState.updateTimestamp(Date.now());
-
+            // Never return seed peers.
             const address = peerAddressState.peerAddress;
+            if (address.isSeed()) {
+                continue;
+            }
+
+            // Only return addresses matching the protocol mask.
+            if ((address.protocol & protocolMask) === 0) {
+                continue;
+            }
+
+            // Only return addresses matching the service mask.
+            if ((address.services & serviceMask) === 0) {
+                continue;
+            }
+
+            // Update timestamp for connected peers.
+            if (peerAddressState.state === PeerAddressState.CONNECTED) {
+                // Also update timestamp for RTC connections
+                if (peerAddressState.bestRoute) {
+                    peerAddressState.bestRoute.timestamp = now;
+                }
+            }
 
             // Never return addresses that are too old.
-            if (this.address.exceedsAge()) {
+            if (address.exceedsAge()) {
                 continue;
             }
 
@@ -82,8 +99,7 @@ class PeerAddressBook extends Observable {
             if (addresses.length >= maxAddresses) {
                 break;
             }
-        }
-        return addresses;
+        }        return addresses;
     }
 
     /**
@@ -157,9 +173,9 @@ class PeerAddressBook extends Observable {
                 return false;
             }
 
-            // Never update the timestamp of seed peers.
+            // Never update seed peers.
             if (knownAddress.isSeed()) {
-                peerAddress.timestamp = 0;
+                return false;
             }
 
             // Never erase NetAddresses.
@@ -177,22 +193,13 @@ class PeerAddressBook extends Observable {
             this._addressList.add(peerAddressState);
             if (peerAddress.protocol === Protocol.RTC) {
                 // Index by peerId.
-                this._addressList.putPeerId.put(peerAddress.peerId, peerAddressState);
+                this._addressList.putPeerId(peerAddress.peerId, peerAddressState);
             }
         }
 
         // Add route.
         if (peerAddress.protocol === Protocol.RTC) {
             peerAddressState.addRoute(channel, peerAddress.distance, peerAddress.timestamp);
-        }
-
-        // If we are currently connected, allow only updates to the netAddress and only if we don't know it yet.
-        if (peerAddressState.state === PeerAddressState.CONNECTED) {
-            if (!peerAddressState.peerAddress.netAddress && peerAddress.netAddress) {
-                peerAddressState.peerAddress.netAddress = peerAddress.netAddress;
-            }
-
-            return false;
         }
 
         // Update the address.
@@ -360,6 +367,16 @@ class PeerAddressBook extends Observable {
                         Log.d(PeerAddressBook, `Deleting old peer address ${addr}`);
                         this._remove(addr);
                     }
+
+                    // Reset failed attempts after bannedUntil has expired.
+                    if (peerAddressState.state === PeerAddressState.FAILED
+                        && peerAddressState.failedAttempts >= peerAddressState.maxFailedAttempts
+                        && peerAddressState.bannedUntil > 0 && peerAddressState.bannedUntil <= now) {
+
+                        peerAddressState.bannedUntil = -1;
+                        peerAddressState.failedAttempts = 0;
+                    }
+                    
                     break;
 
                 case PeerAddressState.BANNED:
@@ -379,8 +396,6 @@ class PeerAddressBook extends Observable {
                     break;
 
                 case PeerAddressState.CONNECTED:
-                    // Keep timestamp up-to-date while we are connected.
-                    addr.timestamp = now;
                     // Also update timestamp for RTC connections
                     if (peerAddressState.bestRoute) {
                         peerAddressState.bestRoute.timestamp = now;
@@ -435,11 +450,6 @@ class PeerAddressBook extends Observable {
                 }
     
                 this._addressList.add(peerAddressState);
-            } else {
-                // Never update the timestamp of seed peers.
-                if (peerAddressState.peerAddress.isSeed()) {
-                    peerAddress.timestamp = 0;
-                }
             }    
         }
         else if (PeerAddressBook.prototype.ban == caller) {
@@ -463,6 +473,33 @@ class PeerAddressBook extends Observable {
         }
 
         // Individual additional behaviour
+        if ([PeerAddressBook.prototype.connected].includes(caller)) {
+            peerAddressState.lastConnected = Date.now();
+            peerAddressState.failedAttempts = 0;
+            peerAddressState.banBackoff = PeerAddressBook.INITIAL_FAILED_BACKOFF;
+
+            peerAddressState.peerAddress = peerAddress;
+
+            // Add route.
+            if (peerAddress.protocol === Protocol.RTC) {
+                peerAddressState.addRoute(channel, peerAddress.distance, peerAddress.timestamp);
+            }
+        }
+
+        if ([PeerAddressBook.prototype.failure].includes(caller)) {
+            peerAddressState.failedAttempts++;
+
+            if (peerAddressState.failedAttempts >= peerAddressState.maxFailedAttempts) {
+                // Remove address only if we have tried the maximum number of backoffs.
+                if (peerAddressState.banBackoff >= PeerAddressBook.MAX_FAILED_BACKOFF) {
+                    peerAddressState._remove(peerAddress);
+                } else {
+                    peerAddressState.ban(peerAddress, peerAddressState.banBackoff);
+                    peerAddressState.banBackoff = Math.min(PeerAddressBook.MAX_FAILED_BACKOFF, peerAddressState.banBackoff * 2);
+                }
+            }
+        }
+
         if ([PeerAddressBook.prototype.ban].includes(caller)) {
             peerAddressState.bannedUntil = Date.now() + payload.duration ? payload.duration : 0;
 
@@ -481,7 +518,7 @@ class PeerAddressBook extends Observable {
         if ([PeerAddressBook.prototype.unroutable].includes(caller)) {
             if (!peerAddressState.bestRoute || (payload.channel && !peerAddressState.bestRoute.signalChannel.equals(payload.channel))) {
                 Log.w(PeerAddressBook, `Got unroutable for ${peerAddress} on a channel other than the best route.`);
-                return;
+                return null;
             }
     
             peerAddressState.deleteBestRoute();
@@ -489,6 +526,8 @@ class PeerAddressBook extends Observable {
                 this._remove(peerAddressState.peerAddress);
             }
         }
+
+        return peerAddressState;
     }
 }
 PeerAddressBook.MAX_AGE_WEBSOCKET = 1000 * 60 * 30; // 30 minutes

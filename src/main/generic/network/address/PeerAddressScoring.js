@@ -55,6 +55,9 @@ class PeerAddressScoring {
      * @private
      */
     _scoreAddress(peerAddressState) {
+        /**
+         * @type {PeerAddress} peerAddress
+         */
         const peerAddress = peerAddressState.peerAddress;
 
         // Filter addresses that we cannot connect to.
@@ -81,6 +84,7 @@ class PeerAddressScoring {
                 return score;
 
             case PeerAddressState.FAILED:
+                // Don't pick failed addresses when they have failed the maximum number of times.
                 return (1 - (peerAddressState.failedAttempts / peerAddressState.maxFailedAttempts)) * score;
 
             default:
