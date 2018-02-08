@@ -409,7 +409,7 @@ gulp.task('sectest-babel', ['watch'], function () {
 gulp.task('eslint', function () {
     const eslint = require('gulp-eslint');
     return gulp.src(sources.all)
-        .pipe(eslint({quiet: true}))
+        .pipe(eslint())
         .pipe(eslint.format())
         .pipe(eslint.failAfterError());
 });

@@ -227,7 +227,7 @@ class PeerAddressBook extends Observable {
      * @returns {void}
      */
     connected(channel, peerAddress) {
-        this._transition(peerAddress, this.connected);
+        this._transition(peerAddress, this.connected, {channel});
     }
 
     /**
@@ -482,7 +482,7 @@ class PeerAddressBook extends Observable {
 
             // Add route.
             if (peerAddress.protocol === Protocol.RTC) {
-                peerAddressState.addRoute(channel, peerAddress.distance, peerAddress.timestamp);
+                peerAddressState.addRoute(payload.channel, peerAddress.distance, peerAddress.timestamp);
             }
         }
 
