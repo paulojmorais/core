@@ -510,7 +510,7 @@ class PeerAddressBook extends Observable {
         if ([PeerAddressBook.prototype.disconnected].includes(caller)) {
             // XXX Immediately delete address if the remote host closed the connection.
             // Also immediately delete dumb clients, since we cannot connect to those anyway.
-            if ((payload.channel.closedByRemote && PlatformUtils.isOnline()) || peerAddressState.peerAddress.protocol === Protocol.DUMB) {
+            if ((payload.closedByRemote && PlatformUtils.isOnline()) || peerAddressState.peerAddress.protocol === Protocol.DUMB) {
                 this._remove(peerAddress);
             }
         }
