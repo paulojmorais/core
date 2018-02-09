@@ -190,7 +190,7 @@ class PeerAddressState {
 
         if ([PeerAddressBook.prototype.connecting].includes(caller)) {
             if (this.state === PeerAddressState.CONNECTED) {
-                throw `Duplicate connection to ${peerAddress}`;
+                throw `Duplicate connection to ${this.peerAddress}`;
             }
         }
 
