@@ -37,7 +37,7 @@ class Network extends Observable {
      * @param {IBlockchain} blockchain
      * @param {NetworkConfig} networkConfig
      * @param {Time} time
-     * @listens PeerAddressBook#added
+     * @listens PeerAddressOperator#added
      * @listens WebSocketConnector#connection
      * @listens WebSocketConnector#error
      * @listens WebRtcConnector#connection
@@ -110,18 +110,33 @@ class Network extends Observable {
         this._rtcConnector.on('error', (peerAddr, reason) => this._onError(peerAddr, reason));
 
         /**
-         * Helper objects to manage PeerAddressBook.
-         * Must be initialized AFTER the WebSocket/WebRtcConnector.
+         * List services for peer addresses
          * @type {PeerAddressBook}
          * @private
          */
-        this._addressBook = new PeerAddressBook(this._networkConfig);
+        this._addressBook = new PeerAddressBook();
+
+        /**
+         * Helper objects to manage PeerAddressStates.
+         * Must be initialized AFTER the WebSocket/WebRtcConnector.
+         * @type {PeerAddressOperator}
+         * @private
+         */
+        this._addressOperator = new PeerAddressOperator(this._networkConfig, this._addressBook);
 
         // Relay new addresses to peers.
-        this._addressBook.on('added', addresses => {
+        this._addressOperator.on('added', addresses => {
             this._relayAddresses(addresses);
             this._checkPeerCount();
         });
+
+        /**
+         * Pick & score peer addresses
+         * @type {PeerAddressPicker}
+         * @private
+         */
+        this._addressPicker = new PeerAddressPicker(this._networkConfig, this._addressBook);
+
 
         /** @type {SignalStore} */
         this._forwards = new SignalStore();
@@ -186,11 +201,11 @@ class Network extends Observable {
 
     _checkPeerCount() {
         if (this._autoConnect
-            && this.peerCount + this._addressBook.addressList.connectingCount < Network.PEER_COUNT_DESIRED
-            && this._addressBook.addressList.connectingCount < Network.CONNECTING_COUNT_MAX) {
+            && this.peerCount + this._addressBook.connectingCount < Network.PEER_COUNT_DESIRED
+            && this._addressBook.connectingCount < Network.CONNECTING_COUNT_MAX) {
 
             // Pick a peer address that we are not connected to yet.
-            const peerAddress = this._addressBook.examiner.pickAddress();
+            const peerAddress = this._addressPicker.pickAddress();
 
             // We can't connect if we don't know any more addresses.
             if (!peerAddress) {
@@ -224,15 +239,15 @@ class Network extends Observable {
             case Protocol.WS:
                 Log.d(Network, `Connecting to ${peerAddress} ...`);
                 if (this._wsConnector.connect(peerAddress)) {
-                    this._addressBook.connecting(peerAddress);
+                    this._addressOperator.connecting(peerAddress);
                 }
                 break;
 
             case Protocol.RTC: {
-                const signalChannel = this._addressBook.addressList.getChannelByPeerId(peerAddress.peerId);
+                const signalChannel = this._addressBook.getChannelByPeerId(peerAddress.peerId);
                 Log.d(Network, `Connecting to ${peerAddress} via ${signalChannel.peerAddress}...`);
                 if (this._rtcConnector.connect(peerAddress, signalChannel)) {
-                    this._addressBook.connecting(peerAddress);
+                    this._addressOperator.connecting(peerAddress);
                 }
                 break;
             }
@@ -256,7 +271,7 @@ class Network extends Observable {
         // Reject connection if we are already connected to this peer address.
         // This can happen if the peer connects (inbound) while we are
         // initiating a (outbound) connection to it.
-        if (conn.outbound && this._addressBook.isConnected(conn.peerAddress)) {
+        if (conn.outbound && this._addressOperator.isConnected(conn.peerAddress)) {
             conn.close('duplicate connection (outbound, pre handshake)');
             return;
         }
@@ -264,7 +279,7 @@ class Network extends Observable {
         // Reject peer if we have reached max peer count.
         if (this.peerCount >= Network.PEER_COUNT_MAX) {
             if (conn.outbound) {
-                this._addressBook.disconnected(null, conn.peerAddress, false);
+                this._addressOperator.disconnected(null, conn.peerAddress, false);
             }
             conn.close(`max peer count reached (${Network.PEER_COUNT_MAX})`);
             return;
@@ -332,13 +347,13 @@ class Network extends Observable {
         }
 
         // Close connection if we are already connected to this peer.
-        if (this._addressBook.isConnected(peer.peerAddress)) {
+        if (this._addressOperator.isConnected(peer.peerAddress)) {
             agent.channel.close('duplicate connection (post handshake)');
             return;
         }
 
         // Close connection if this peer is banned.
-        if (this._addressBook.isBanned(peer.peerAddress)) {
+        if (this._addressOperator.isBanned(peer.peerAddress)) {
             agent.channel.close('peer is banned');
             return;
         }
@@ -360,7 +375,7 @@ class Network extends Observable {
         this._updateTimeOffset();
 
         // Mark the peer's address as connected.
-        this._addressBook.connected(agent.channel, peer.peerAddress);
+        this._addressOperator.connected(agent.channel, peer.peerAddress);
 
         // Tell others about the address that we just connected to.
         this._relayAddresses([peer.peerAddress]);
@@ -384,7 +399,7 @@ class Network extends Observable {
     _onError(peerAddress, reason) {
         Log.w(Network, `Connection to ${peerAddress} failed` + (reason ? ` - ${reason}` : ''));
 
-        this._addressBook.failure(peerAddress);
+        this._addressOperator.failure(peerAddress);
 
         this._checkPeerCount();
     }
@@ -410,9 +425,9 @@ class Network extends Observable {
         // peerAddress is undefined for incoming connections pre-handshake.
         if (channel.peerAddress) {
             // Check if the handshake with this peer has completed.
-            if (this._addressBook.isConnected(channel.peerAddress)) {
+            if (this._addressOperator.isConnected(channel.peerAddress)) {
                 // Mark peer as disconnected.
-                this._addressBook.disconnected(channel, channel.peerAddress, closedByRemote);
+                this._addressOperator.disconnected(channel, channel.peerAddress, closedByRemote);
 
                 // Tell listeners that this peer has gone away.
                 this.fire('peer-left', peer);
@@ -429,9 +444,9 @@ class Network extends Observable {
                 // Treat connections closed pre-handshake by remote as failed attempts.
                 Log.w(Network, `Connection to ${channel.peerAddress} closed pre-handshake (by ${closedByRemote ? 'remote' : 'us'})`);
                 if (closedByRemote) {
-                    this._addressBook.failure(channel.peerAddress);
+                    this._addressOperator.failure(channel.peerAddress);
                 } else {
-                    this._addressBook.disconnected(null, channel.peerAddress, false);
+                    this._addressOperator.disconnected(null, channel.peerAddress, false);
                 }
             }
         }
@@ -454,7 +469,7 @@ class Network extends Observable {
         // Ban the netAddress in this case.
         // XXX We should probably always ban the netAddress as well.
         if (channel.peerAddress) {
-            this._addressBook.ban(channel.peerAddress);
+            this._addressOperator.ban(channel.peerAddress);
         } else {
             // TODO ban netAddress
         }
@@ -469,7 +484,7 @@ class Network extends Observable {
      */
     _onFail(channel, reason) {
         if (channel.peerAddress) {
-            this._addressBook.failure(channel.peerAddress);
+            this._addressOperator.failure(channel.peerAddress);
         }
     }
 
@@ -536,8 +551,8 @@ class Network extends Observable {
         // If the signal has the unroutable flag set and we previously forwarded a matching signal,
         // mark the route as unusable.
         if (msg.isUnroutable() && this._forwards.signalForwarded(/*senderId*/ msg.recipientId, /*recipientId*/ msg.senderId, /*nonce*/ msg.nonce)) {
-            const senderAddr = this._addressBook.addressList.getByPeerId(msg.senderId);
-            this._addressBook.unroutable(channel, senderAddr);
+            const senderAddr = this._addressBook.getByPeerId(msg.senderId);
+            this._addressOperator.unroutable(channel, senderAddr);
         }
 
         // If the signal is intended for us, pass it on to our WebRTC connector.
@@ -545,8 +560,8 @@ class Network extends Observable {
             // If we sent out a signal that did not reach the recipient because of TTL
             // or it was unroutable, delete this route.
             if (this._rtcConnector.isValidSignal(msg) && (msg.isUnroutable() || msg.isTtlExceeded())) {
-                const senderAddr = this._addressBook.addressList.getByPeerId(msg.senderId);
-                this._addressBook.unroutable(channel, senderAddr);
+                const senderAddr = this._addressBook.getByPeerId(msg.senderId);
+                this._addressOperator.unroutable(channel, senderAddr);
             }
             this._rtcConnector.onSignal(channel, msg);
             return;
@@ -563,7 +578,7 @@ class Network extends Observable {
         }
 
         // Otherwise, try to forward the signal to the intended recipient.
-        const signalChannel = this._addressBook.addressList.getChannelByPeerId(msg.recipientId);
+        const signalChannel = this._addressBook.getChannelByPeerId(msg.recipientId);
         if (!signalChannel) {
             Log.d(Network, `Failed to forward signal from ${msg.senderId} to ${msg.recipientId} - no route found`);
             // If we don't know a route to the intended recipient, return signal to sender with unroutable flag set and payload removed.
@@ -602,22 +617,22 @@ class Network extends Observable {
 
     /** @type {number} */
     get peerCount() {
-        return this._addressBook.addressList.peerCount;
+        return this._addressBook.peerCount;
     }
 
     /** @type {number} */
     get peerCountWebSocket() {
-        return this._addressBook.addressList.peerCountWs;
+        return this._addressBook.peerCountWs;
     }
 
     /** @type {number} */
     get peerCountWebRtc() {
-        return this._addressBook.addressList.peerCountRtc;
+        return this._addressBook.peerCountRtc;
     }
 
     /** @type {number} */
     get peerCountDumb() {
-        return this._addressBook.addressList.peerCountDumb;
+        return this._addressBook.peerCountDumb;
     }
 
     /** @type {number} */

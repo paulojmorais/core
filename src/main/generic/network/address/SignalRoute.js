@@ -24,7 +24,7 @@ class SignalRoute {
 
     /** @type {number} */
     get score() {
-        return ((PeerAddressBook.MAX_DISTANCE - this._distance) / 2) * (1 - (this.failedAttempts / PeerAddressBook.MAX_FAILED_ATTEMPTS_RTC));
+        return ((PeerAddressOperator.MAX_DISTANCE - this._distance) / 2) * (1 - (this.failedAttempts / PeerAddressOperator.MAX_FAILED_ATTEMPTS_RTC));
     }
 
     /**

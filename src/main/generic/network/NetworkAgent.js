@@ -127,7 +127,7 @@ class NetworkAgent extends Observable {
         // the peer knows is older than RELAY_THROTTLE, relay the address again.
         const filteredAddresses = addresses.filter(addr => {
             // Exclude RTC addresses that are already at MAX_DISTANCE.
-            if (addr.protocol === Protocol.RTC && addr.distance >= PeerAddressBook.MAX_DISTANCE) {
+            if (addr.protocol === Protocol.RTC && addr.distance >= PeerAddressOperator.MAX_DISTANCE) {
                 return false;
             }
 
@@ -247,7 +247,7 @@ class NetworkAgent extends Observable {
         this._observedPeerAddress = msg.peerAddress;
         if (!this._observedPeerAddress.netAddress) {
             /** @type {PeerAddress} */
-            const storedAddress = this._addressBook.addressList.getPeerAddress(this._observedPeerAddress);
+            const storedAddress = this._addressBook.getPeerAddress(this._observedPeerAddress);
             if (storedAddress && storedAddress.netAddress) {
                 this._observedPeerAddress.netAddress = storedAddress.netAddress;
             }
@@ -413,7 +413,7 @@ class NetworkAgent extends Observable {
 
         const filteredAddresses = addresses.filter(addr => {
             // Exclude RTC addresses that are already at MAX_DISTANCE.
-            if (addr.protocol === Protocol.RTC && addr.distance >= PeerAddressBook.MAX_DISTANCE) {
+            if (addr.protocol === Protocol.RTC && addr.distance >= PeerAddressOperator.MAX_DISTANCE) {
                 return false;
             }
 

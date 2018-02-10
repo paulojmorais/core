@@ -117,13 +117,13 @@ class PeerAddress {
         const age = Date.now() - this.timestamp;
         switch (this.protocol) {
             case Protocol.WS:
-                return age > PeerAddressBook.MAX_AGE_WEBSOCKET;
+                return age > PeerAddressOperator.MAX_AGE_WEBSOCKET;
 
             case Protocol.RTC:
-                return age > PeerAddressBook.MAX_AGE_WEBRTC;
+                return age > PeerAddressOperator.MAX_AGE_WEBRTC;
 
             case Protocol.DUMB:
-                return age > PeerAddressBook.MAX_AGE_DUMB;
+                return age > PeerAddressOperator.MAX_AGE_DUMB;
         }
         return false;
     }

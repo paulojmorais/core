@@ -1,23 +1,27 @@
-class PeerAddressScoring {
+class PeerAddressPicker {
     /**
      * @constructor
-     * @param {PeerAddressList} addressList
      * @param {NetworkConfig} networkConfig
+     * @param {PeerAddressBook} addressBook
      */
-    constructor(addressList, networkConfig) {
+    constructor(networkConfig, addressBook) {
         /**
          * @private
-         * @type {PeerAddressList}
+         * @type {NetworkConfig}
          */
-        this._addressList = addressList;
         this._networkConfig = networkConfig;
+        /**
+         * @private
+         * @type {PeerAddressBook}
+         */
+        this._addressBook = addressBook;
     }
 
     /**
      * @returns {?PeerAddress}
      */
     pickAddress() {
-        const addresses = this._addressList.values();
+        const addresses = this._addressBook.values();
         const numAddresses = addresses.length;
 
         // Pick a random start index.
@@ -101,7 +105,7 @@ class PeerAddressScoring {
         let score = 1;
 
         // We want at least two websocket connection
-        if (this._addressList.peerCountWs < 2) {
+        if (this._addressBook.peerCountWs < 2) {
             score *= peerAddress.protocol === Protocol.WS ? 3 : 1;
         } else {
             score *= peerAddress.protocol === Protocol.RTC ? 3 : 1;
@@ -114,7 +118,7 @@ class PeerAddressScoring {
         //  ...
         // We only expect distance >= 2 here.
         if (peerAddress.protocol === Protocol.RTC) {
-            score *= 1 + ((PeerAddressBook.MAX_DISTANCE - peerAddress.distance) / 2);
+            score *= 1 + ((PeerAddressOperator.MAX_DISTANCE - peerAddress.distance) / 2);
         }
 
         return score;
@@ -122,4 +126,4 @@ class PeerAddressScoring {
 
 
 }
-Class.register(PeerAddressScoring);
+Class.register(PeerAddressPicker);
