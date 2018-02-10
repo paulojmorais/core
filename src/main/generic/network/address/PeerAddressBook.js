@@ -166,7 +166,7 @@ class PeerAddressBook {
             }
 
             // Never return addresses that are too old.
-            if (this._exceedsAge(address)) {
+            if (address.exceedsAge()) {
                 continue;
             }
 

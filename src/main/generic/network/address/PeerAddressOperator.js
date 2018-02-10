@@ -19,7 +19,7 @@ class PeerAddressOperator extends Observable {
          * @type {PeerAddressBook}
          * @private
          */
-        this._addressBook = new PeerAddressBook();
+        this._addressBook = addressBook;
 
         // Init seed peers.
         this.add(/*channel*/ null, PeerAddressOperator.SEED_PEERS);
