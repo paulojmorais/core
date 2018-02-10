@@ -46,7 +46,7 @@ class WebSocketConnector extends Observable {
 
             // We don't want to fire the error event again if the websocket
             // connect fails at a later time.
-            ws.onerror = null;
+            ws.onerror = () => {};
 
             // If the connection succeeds after we have fired the error event,
             // close it.

@@ -35,6 +35,7 @@ class WebSocketConnector extends Observable {
         const ws = WebSocketFactory.newWebSocket(`wss://${peerAddress.host}:${peerAddress.port}`, {
             handshakeTimeout: WebSocketConnector.CONNECT_TIMEOUT
         });
+        ws.binaryType = 'arraybuffer';
         ws.onopen = () => {
             this._timers.clearTimeout(timeoutKey);
 
@@ -55,10 +56,12 @@ class WebSocketConnector extends Observable {
         this._timers.setTimeout(timeoutKey, () => {
             this._timers.clearTimeout(timeoutKey);
 
-            // We don't want to fire the error event again if the websocket connect fails at a later time.
+            // We don't want to fire the error event again if the websocket
+            // connect fails at a later time.
             ws.onerror = () => {};
 
-            // If the connection succeeds after we have fired the error event, close it.
+            // If the connection succeeds after we have fired the error event,
+            // close it.
             ws.onopen = () => {
                 Log.w(WebSocketConnector, `Connection to ${peerAddress} succeeded after timeout - closing it`);
                 ws.close();
