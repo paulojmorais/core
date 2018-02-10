@@ -29,6 +29,13 @@ class PeerAddressOperator extends Observable {
     }
 
     /**
+     * @returns {PeerAddressBook}
+     */
+    get addressBook() {
+        return this._addressBook;
+    }
+
+    /**
      * @param {PeerChannel} channel
      * @param {PeerAddress|Array.<PeerAddress>} arg
      */

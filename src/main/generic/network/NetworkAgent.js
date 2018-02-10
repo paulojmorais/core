@@ -1,7 +1,7 @@
 class NetworkAgent extends Observable {
     /**
      * @param {IBlockchain} blockchain
-     * @param {PeerAddressBook} addresses
+     * @param {PeerAddressOperator} addressOperator
      * @param {NetworkConfig} networkConfig
      * @param {PeerChannel} channel
      *
@@ -13,12 +13,12 @@ class NetworkAgent extends Observable {
      * @listens PeerChannel#pong
      * @listens PeerChannel#close
      */
-    constructor(blockchain, addressBook, networkConfig, channel) {
+    constructor(blockchain, addressOperator, networkConfig, channel) {
         super();
         /** @type {IBlockchain} */
         this._blockchain = blockchain;
         /** @type {PeerAddressBook} */
-        this._addressBook = addressBook;
+        this._addressOperator = addressOperator;
         /** @type {NetworkConfig} */
         this._networkConfig = networkConfig;
         /** @type {PeerChannel} */
@@ -247,7 +247,7 @@ class NetworkAgent extends Observable {
         this._observedPeerAddress = msg.peerAddress;
         if (!this._observedPeerAddress.netAddress) {
             /** @type {PeerAddress} */
-            const storedAddress = this._addressBook.getPeerAddress(this._observedPeerAddress);
+            const storedAddress = this._addressOperator.addressBook.getPeerAddress(this._observedPeerAddress);
             if (storedAddress && storedAddress.netAddress) {
                 this._observedPeerAddress.netAddress = storedAddress.netAddress;
             }
@@ -391,7 +391,7 @@ class NetworkAgent extends Observable {
         }
 
         // Put the new addresses in the address pool.
-        this._addressBook.add(this._channel, msg.addresses);
+        this._addressOperator.add(this._channel, msg.addresses);
 
         // Tell listeners that we have received new addresses.
         this.fire('addr', msg.addresses, this);
@@ -409,7 +409,7 @@ class NetworkAgent extends Observable {
         }
 
         // Find addresses that match the given serviceMask.
-        const addresses = this._addressBook.query(msg.protocolMask, msg.serviceMask);
+        const addresses = this._addressOperator.addressBook.query(msg.protocolMask, msg.serviceMask);
 
         const filteredAddresses = addresses.filter(addr => {
             // Exclude RTC addresses that are already at MAX_DISTANCE.

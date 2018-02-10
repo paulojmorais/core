@@ -120,34 +120,6 @@ class PeerAddressState {
         return this._routes.length > 0;
     }
 
-
-    /**
-     * @returns {boolean}
-     */
-    isQueryable() {
-        // Never return banned or failed addresses.
-        if (this.state === PeerAddressState.BANNED || this.state === PeerAddressState.FAILED) {
-            return false;
-        }
-
-        // Never return seed peers.
-        const address = this.peerAddress;
-        if (address.isSeed()) {
-            return false;
-        }
-
-        // Only return addresses matching the protocol mask.
-        if ((address.protocol & protocolMask) === 0) {
-            return false;
-        }
-
-        // Only return addresses matching the service mask.
-        if ((address.services & serviceMask) === 0) {
-            return false;
-        }
-        return true;   
-    }
-
     /**
      * @param {number} time
      * @returns {void}

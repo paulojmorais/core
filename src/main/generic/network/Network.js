@@ -296,7 +296,7 @@ class Network extends Observable {
         channel.on('fail', reason => this._onFail(channel, reason));
 
         // Create network agent.
-        const agent = new NetworkAgent(this._blockchain, this._addressBook, this._networkConfig, channel);
+        const agent = new NetworkAgent(this._blockchain, this._addressOperator, this._networkConfig, channel);
         agent.on('handshake', peer => this._onHandshake(peer, agent));
         agent.on('close', (peer, channel, closedByRemote) => this._onClose(peer, channel, closedByRemote));
 
